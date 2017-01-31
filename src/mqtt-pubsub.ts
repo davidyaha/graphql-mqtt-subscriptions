@@ -117,7 +117,6 @@ export class MQTTPubSub implements PubSubEngine {
       return;
 
     const messageString = message.toString(this.parseMessageWithEncoding);
-    console.log('got message', messageString);
     let parsedMessage;
     try {
       parsedMessage = JSON.parse(messageString);
