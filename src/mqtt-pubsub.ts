@@ -44,7 +44,11 @@ export class MQTTPubSub implements PubSubEngine {
   }
 
   public publish(trigger: string, payload: any): boolean {
-    this.mqttConnection.publish(trigger, JSON.stringify(payload));
+    this.publishOptionsResolver(trigger, payload).then(publishOptions => {
+      const message = Buffer.from(JSON.stringify(payload), this.parseMessageWithEncoding);
+      
+      this.mqttConnection.publish(trigger, message, publishOptions);
+    });
     return true;
   }
 
@@ -147,5 +151,5 @@ export type Path = Array<string | number>;
 export type Trigger = string | Path;
 export type TriggerTransform = (trigger: Trigger, channelOptions?: Object) => string;
 export type SubscribeOptionsResolver = (trigger: Trigger, channelOptions?: Object) => Promise<ClientSubscribeOptions>;
-export type PublishOptionsResolver = (trigger: Trigger, payload: any, channelOptions?: Object) => Promise<ClientPublishOptions>;
+export type PublishOptionsResolver = (trigger: Trigger, payload: any) => Promise<ClientPublishOptions>;
 export type SubscribeHandler = (id: number, granted: Granted) => void;
