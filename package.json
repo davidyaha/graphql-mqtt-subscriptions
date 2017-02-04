@@ -22,7 +22,7 @@
   "scripts": {
     "compile": "tsc",
     "pretest": "npm run compile",
-    "test": "npm run testonly -- && npm run integration --",
+    "test": "npm run testonly --",
     "posttest": "npm run lint",
     "lint": "tslint ./src/**/*.ts",
     "watch": "tsc -w",

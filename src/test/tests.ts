@@ -13,12 +13,12 @@ const expect = chai.expect;
 let listener;
 
 const publishSpy = spy((channel, message, options, cb) => listener && listener(channel, message));
-const subscribeSpy = spy((topic, options, cb) => cb && cb(null, {topic}));
+const subscribeSpy = spy((topic, options, cb) => cb && cb(null, {...options, topic}));
 const unsubscribeSpy = spy((channel, options, cb) => cb && cb(channel));
 
 const mqttPackage = mqtt as Object;
 
-const connect = function() {
+const connect = function () {
   return {
     publish: publishSpy,
     subscribe: subscribeSpy,
@@ -35,25 +35,27 @@ mqttPackage['connect'] = connect;
 
 // -------------- Mocking mqtt Client ------------------
 
-
 describe('MQTTPubSub', function () {
 
   const pubSub = new MQTTPubSub();
 
   it('can subscribe to specific mqtt channel and called when a message is published on it', function (done) {
+    let sub;
+    const onMessage = message => {
+      pubSub.unsubscribe(sub);
 
-    pubSub.subscribe('Posts', message => {
       try {
         expect(message).to.equals('test');
         done();
       } catch (e) {
         done(e);
       }
+    };
 
-    }).then(subId => {
+    pubSub.subscribe('Posts', onMessage).then(subId => {
       expect(subId).to.be.a('number');
       pubSub.publish('Posts', 'test');
-      pubSub.unsubscribe(subId);
+      sub = subId;
     }).catch(err => done(err));
   });
 
@@ -75,39 +77,46 @@ describe('MQTTPubSub', function () {
 
   it('cleans up correctly the memory when unsubscribing', function (done) {
     Promise.all([
-      pubSub.subscribe('Posts', () => null),
-      pubSub.subscribe('Posts', () => null),
-    ])
-    .then(([subId, secondSubId]) => {
-      try {
-        // This assertion is done against a private member, if you change the internals, you may want to change that
-        expect((pubSub as any).subscriptionMap[subId]).not.to.be.an('undefined');
-        pubSub.unsubscribe(subId);
-        // This assertion is done against a private member, if you change the internals, you may want to change that
-        expect((pubSub as any).subscriptionMap[subId]).to.be.an('undefined');
-        expect(() => pubSub.unsubscribe(subId)).to.throw(`There is no subscription of id "${subId}"`);
-        pubSub.unsubscribe(secondSubId);
-        done();
+             pubSub.subscribe('Posts', () => null),
+             pubSub.subscribe('Posts', () => null),
+           ])
+           .then(([subId, secondSubId]) => {
+             try {
+               // This assertion is done against a private member, if you change the internals, you may want to change that
+               expect((pubSub as any).subscriptionMap[subId]).not.to.be.an('undefined');
+               pubSub.unsubscribe(subId);
 
-      } catch (e) {
-        done(e);
-      }
-    });
+               // This assertion is done against a private member, if you change the internals, you may want to change that
+               expect((pubSub as any).subscriptionMap[subId]).to.be.an('undefined');
+               expect(() => pubSub.unsubscribe(subId)).to.throw(`There is no subscription of id "${subId}"`);
+               pubSub.unsubscribe(secondSubId);
+               done();
+             } catch (e) {
+               done(e);
+             }
+           });
   });
 
   it('will not unsubscribe from the mqtt channel if there is another subscriber on it\'s subscriber list', function (done) {
+    let lastSubId;
+    const onMessage = msg => {
+      // Check onMessage support
+      pubSub.unsubscribe(lastSubId);
+      expect(unsubscribeSpy.callCount).to.equals(1);
+
+      try {
+        expect(msg).to.equals('test');
+        done();
+      } catch (e) {
+        done(e);
+      }
+    };
+
     const subscriptionPromises = [
       pubSub.subscribe('Posts', () => {
         done('Not supposed to be triggered');
       }),
-      pubSub.subscribe('Posts', (msg) => {
-        try {
-          expect(msg).to.equals('test');
-          done();
-        } catch (e) {
-          done(e);
-        }
-      }),
+      pubSub.subscribe('Posts', onMessage),
     ];
 
     Promise.all(subscriptionPromises).then(subIds => {
@@ -118,8 +127,7 @@ describe('MQTTPubSub', function () {
         expect(unsubscribeSpy.callCount).to.equals(0);
 
         pubSub.publish('Posts', 'test');
-        pubSub.unsubscribe(subIds[1]);
-        expect(unsubscribeSpy.callCount).to.equals(1);
+        lastSubId = subIds[1];
       } catch (e) {
         done(e);
       }
@@ -147,7 +155,23 @@ describe('MQTTPubSub', function () {
   });
 
   it('can have multiple subscribers and all will be called when a message is published to this channel', function (done) {
-    const onMessageSpy = spy(() => null);
+    let unSubIds = [];
+    let callCount = 0;
+    const onMessageSpy = spy(() => {
+      callCount++;
+
+      if (callCount === 2) {
+        pubSub.unsubscribe(unSubIds[0]);
+        pubSub.unsubscribe(unSubIds[1]);
+
+        expect(onMessageSpy.callCount).to.equals(2);
+        onMessageSpy.calls.forEach(call => {
+          expect(call.args).to.have.members(['test']);
+        });
+
+        done();
+      }
+    });
     const subscriptionPromises = [
       pubSub.subscribe('Posts', onMessageSpy as Function),
       pubSub.subscribe('Posts', onMessageSpy as Function),
@@ -159,14 +183,7 @@ describe('MQTTPubSub', function () {
 
         pubSub.publish('Posts', 'test');
 
-        expect(onMessageSpy.callCount).to.equals(2);
-        onMessageSpy.calls.forEach(call => {
-          expect(call.args).to.have.members(['test']);
-        });
-
-        pubSub.unsubscribe(subIds[0]);
-        pubSub.unsubscribe(subIds[1]);
-        done();
+        unSubIds = subIds;
       } catch (e) {
         done(e);
       }
@@ -174,17 +191,22 @@ describe('MQTTPubSub', function () {
   });
 
   it('can publish objects as well', function (done) {
-    pubSub.subscribe('Posts', message => {
+    let unSubId;
+    const onMessage = message => {
+      pubSub.unsubscribe(unSubId);
+
       try {
         expect(message).to.have.property('comment', 'This is amazing');
         done();
       } catch (e) {
         done(e);
       }
-    }).then(subId => {
+    };
+
+    pubSub.subscribe('Posts', onMessage).then(subId => {
       try {
-        pubSub.publish('Posts', {comment : 'This is amazing'});
-        pubSub.unsubscribe(subId);
+        pubSub.publish('Posts', {comment: 'This is amazing'});
+        unSubId = subId;
       } catch (e) {
         done(e);
       }
@@ -202,7 +224,10 @@ describe('MQTTPubSub', function () {
       triggerTransform,
     });
 
+    let unSubId;
     const validateMessage = message => {
+      pubsub.unsubscribe(unSubId);
+
       try {
         expect(message).to.equals('test');
         done();
@@ -213,12 +238,75 @@ describe('MQTTPubSub', function () {
 
     pubsub.subscribe('comments', validateMessage, {repoName: 'graphql-mqtt-subscriptions'}).then(subId => {
       pubsub.publish('comments.graphql-mqtt-subscriptions', 'test');
-      pubsub.unsubscribe(subId);
+      unSubId = subId;
     });
 
   });
 
-  // TODO pattern subs
+  it('allows to change encodings of messages passed through MQTT broker', function (done) {
+    const pubsub = new MQTTPubSub({
+      parseMessageWithEncoding: 'base64',
+    });
+
+    let unSubId;
+    const validateMessage = message => {
+      pubsub.unsubscribe(unSubId);
+
+      try {
+        expect(message).to.equals('test');
+        done();
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubsub.subscribe('comments', validateMessage).then(subId => {
+      pubsub.publish('comments', 'test');
+      unSubId = subId;
+    });
+  });
+
+  it('allows to QoS for each publish topic', function (done) {
+    const pubsub = new MQTTPubSub({
+      publishOptions: topic => Promise.resolve({qos: topic === 'comments' ? 2 : undefined}),
+    });
+
+    let unSubId;
+    const validateMessage = message => {
+      pubsub.unsubscribe(unSubId);
+
+      try {
+        expect(publishSpy.calls[0].args[2].qos).to.equals(2);
+        expect(message).to.equals('test');
+        done();
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubsub.subscribe('comments', validateMessage).then(subId => {
+      pubsub.publish('comments', 'test');
+      unSubId = subId;
+    });
+  });
+
+  it('allows to set QoS for each topic subscription', function (done) {
+    const pubsub = new MQTTPubSub({
+      subscribeOptions: topic => Promise.resolve({qos: topic === 'comments' ? 2 : undefined}),
+      onMQTTSubscribe: (id, granted) => {
+        pubsub.unsubscribe(id);
+        try {
+          expect(granted.topic).to.equals('comments');
+          expect(granted.qos).to.equals(2);
+          done();
+        } catch (e) {
+          done(e);
+        }
+      },
+    });
+
+    pubsub.subscribe('comments', () => null).catch(done);
+  });
 
   afterEach('Reset spy count', () => {
     publishSpy.reset();
