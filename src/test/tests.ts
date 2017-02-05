@@ -12,9 +12,9 @@ const expect = chai.expect;
 
 let listener;
 
-const publishSpy = spy((channel, message, options, cb) => listener && listener(channel, message));
+const publishSpy = spy((channel, message) => listener && listener(channel, message));
 const subscribeSpy = spy((topic, options, cb) => cb && cb(null, {...options, topic}));
-const unsubscribeSpy = spy((channel, options, cb) => cb && cb(channel));
+const unsubscribeSpy = spy((channel, _, cb) => cb && cb(channel));
 
 const mqttPackage = mqtt as Object;
 
