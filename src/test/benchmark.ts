@@ -67,7 +67,7 @@ const schema = new GraphQLSchema({
     fields: {
       testString: {
         type: GraphQLString,
-        resolve: function (_, args) {
+        resolve: function () {
           return 'works';
         },
       },

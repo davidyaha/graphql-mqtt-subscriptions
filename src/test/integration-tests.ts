@@ -23,7 +23,7 @@ const schema = new GraphQLSchema({
     fields: {
       testString: {
         type: GraphQLString,
-        resolve: function (_, args) {
+        resolve: function () {
           return 'works';
         },
       },
@@ -40,7 +40,7 @@ const schema = new GraphQLSchema({
       },
       testFilter: {
         type: GraphQLString,
-        resolve: function (root, {filterBoolean}) {
+        resolve: function (_, {filterBoolean}) {
           return filterBoolean ? 'goodFilter' : 'badFilter';
         },
         args: {
@@ -49,7 +49,7 @@ const schema = new GraphQLSchema({
       },
       testFilterMulti: {
         type: GraphQLString,
-        resolve: function (root, {filterBoolean}) {
+        resolve: function (_, {filterBoolean}) {
           return filterBoolean ? 'goodFilter' : 'badFilter';
         },
         args: {
@@ -76,12 +76,12 @@ const mqttClient = connect('mqtt://localhost');
 const subManager = new SubscriptionManager({
   schema,
   setupFunctions: {
-    'testFilter': (options, {filterBoolean}) => {
+    'testFilter': (_, {filterBoolean}) => {
       return {
         'Filter1': {filter: (root) => root.filterBoolean === filterBoolean},
       };
     },
-    'testFilterMulti': (options) => {
+    'testFilterMulti': () => {
       return {
         'Trigger1': {filter: () => true},
         'Trigger2': {filter: () => true},
@@ -126,6 +126,10 @@ describe('SubscriptionManager', function () {
   it.only('can subscribe with a valid query and get the root value', function (done) {
     const query = 'subscription X{ testSubscription }';
     const callback = function (err, payload) {
+      if (err) {
+        done(err);
+      }
+
       try {
         expect(payload.data.testSubscription).to.equals('good');
       } catch (e) {
@@ -148,6 +152,10 @@ describe('SubscriptionManager', function () {
        testFilter(filterBoolean: $filterBoolean)
       }`;
     const callback = function (err, payload) {
+      if (err) {
+        done(err);
+      }
+
       try {
         expect(payload.data.testFilter).to.equals('goodFilter');
       } catch (e) {
@@ -179,6 +187,10 @@ describe('SubscriptionManager', function () {
        testFilterMulti(filterBoolean: $filterBoolean, a: $uga, b: 66)
       }`;
     const callback = function (err, payload) {
+      if (err) {
+        done(err);
+      }
+
       try {
         expect(payload.data.testFilterMulti).to.equals('goodFilter');
         triggerCount++;
@@ -207,7 +219,11 @@ describe('SubscriptionManager', function () {
 
   it('can unsubscribe', function (done) {
     const query = 'subscription X{ testSubscription }';
-    const callback = (err, payload) => {
+    const callback = (err) => {
+      if (err) {
+        done(err);
+      }
+
       try {
         assert(false);
       } catch (e) {
@@ -236,7 +252,7 @@ describe('SubscriptionManager', function () {
       try {
         expect(payload).to.be.undefined;
         expect(err.message).to.equals(
-          'Variable "$uga" of required type "Boolean!" was not provided.'
+          'Variable "$uga" of required type "Boolean!" was not provided.',
         );
       } catch (e) {
         done(e);
@@ -262,7 +278,7 @@ describe('SubscriptionManager', function () {
     const subManager2 = new SubscriptionManager({
       schema,
       setupFunctions: {
-        testChannelOptions: (options, {repoName}) => ({
+        testChannelOptions: (_, {repoName}) => ({
           comments: {
             channelOptions: {path: [repoName]},
           },
@@ -272,6 +288,10 @@ describe('SubscriptionManager', function () {
     });
 
     const callback = (err, payload) => {
+      if (err) {
+        done(err);
+      }
+
       try {
         expect(payload.data.testChannelOptions).to.equals('test');
         done();

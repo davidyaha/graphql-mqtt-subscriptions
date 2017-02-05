@@ -129,7 +129,7 @@ export class MQTTPubSub implements PubSubEngine {
     }
 
     each(subscribers, (subId, cb) => {
-      const [triggerName, listener] = this.subscriptionMap[subId];
+      const [,listener] = this.subscriptionMap[subId];
       listener(parsedMessage);
       cb();
     })
