@@ -34,7 +34,7 @@
     "prepublish": "npm run test"
   },
   "dependencies": {
-    "async": "^2.0.1",
+    "async": "^2.1.5",
     "graphql-subscriptions": "^0.3.0",
     "mqtt": "^2.3.0"
   },
