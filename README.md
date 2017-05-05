@@ -1,5 +1,7 @@
 # graphql-mqtt-subscriptions
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/davidyaha/graphql-mqtt-subscriptions.svg)](https://greenkeeper.io/)
+
 This package implements the PusSubEngine Interface from the graphql-subscriptions package. 
 It allows you to connect your subscriptions manger to an MQTT enabled Pub Sub broker to support 
 horizontally scalable subscriptions setup.
