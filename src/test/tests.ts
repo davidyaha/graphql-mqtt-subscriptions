@@ -1,7 +1,7 @@
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
-import {spy, restore} from 'simple-mock';
-
+import { spy, restore } from 'simple-mock';
+import { isAsyncIterable } from 'iterall';
 import * as mqtt from 'mqtt';
 import {MQTTPubSub} from '../mqtt-pubsub';
 
@@ -316,6 +316,94 @@ describe('MQTTPubSub', function () {
 
   after('Restore mqtt client', () => {
     restore();
+  });
+
+});
+
+describe('PubSubAsyncIterator', function () {
+
+  it('should expose valid asyncItrator for a specific event', () => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator(eventName);
+    // tslint:disable-next-line:no-unused-expression
+    expect(iterator).to.exist;
+    // tslint:disable-next-line:no-unused-expression
+    expect(isAsyncIterable(iterator)).to.be.true;
+  });
+
+  it('should trigger event on asyncIterator when published', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator(eventName);
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.exist;
+      done();
+    });
+
+    pubSub.publish(eventName, { test: true });
+  });
+
+  it('should not trigger event on asyncIterator when publishing other event', () => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test2';
+    const iterator = pubSub.asyncIterator('test');
+    const triggerSpy = spy(() => undefined);
+
+    iterator.next().then(triggerSpy);
+    pubSub.publish(eventName, { test: true });
+    expect(triggerSpy.callCount).to.equal(0);
+  });
+
+  it('register to multiple events', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test2';
+    const iterator = pubSub.asyncIterator(['test', 'test2']);
+    const triggerSpy = spy(() => undefined);
+
+    iterator.next().then(() => {
+      triggerSpy();
+      expect(triggerSpy.callCount).to.be.gte(1);
+      done();
+    });
+    pubSub.publish(eventName, { test: true });
+  });
+
+  it('should not trigger event on asyncIterator already returned', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator<any>(eventName);
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).to.exist;
+      expect(result.value.test).to.equal('word');
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.be.false;
+    });
+
+    pubSub.publish(eventName, { test: 'word' });
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).not.to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.be.true;
+      done();
+    });
+
+    iterator.return();
+    pubSub.publish(eventName, { test: true });
   });
 
 });

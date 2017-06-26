@@ -1,6 +1,6 @@
-import {PubSubEngine} from 'graphql-subscriptions/dist/pubsub';
+import { PubSubEngine } from 'graphql-subscriptions/dist/pubsub-engine';
 import {connect, Client, ClientPublishOptions, ClientSubscribeOptions, Granted} from 'mqtt';
-import {each} from 'async';
+import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 export interface PubSubMQTTOptions {
   brokerUrl?: string;
@@ -113,6 +113,10 @@ export class MQTTPubSub implements PubSubEngine {
     delete this.subscriptionMap[subId];
   }
 
+  public asyncIterator<T>(triggers: string | string[]): AsyncIterator<T> {
+    return new PubSubAsyncIterator<T>(this, triggers);
+  }
+
   private onMessage(topic: string, message: Buffer) {
     const subscribers = this.subsRefsMap[topic];
 
@@ -128,11 +132,10 @@ export class MQTTPubSub implements PubSubEngine {
       parsedMessage = messageString;
     }
 
-    each(subscribers, (subId, cb) => {
-      const [,listener] = this.subscriptionMap[subId];
+    for (const subId of subscribers) {
+      const listener = this.subscriptionMap[subId][1];
       listener(parsedMessage);
-      cb();
-    })
+    }
   }
 
   private triggerTransform: TriggerTransform;
