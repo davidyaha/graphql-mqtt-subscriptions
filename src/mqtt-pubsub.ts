@@ -1,5 +1,5 @@
 import { PubSubEngine } from 'graphql-subscriptions/dist/pubsub-engine';
-import {connect, Client, ClientPublishOptions, ClientSubscribeOptions, Granted} from 'mqtt';
+import {connect, Client, ClientPublishOptions, ClientSubscribeOptions, Granted } from 'mqtt';
 import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 
