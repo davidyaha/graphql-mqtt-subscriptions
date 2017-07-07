@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "mqtt": "registry:dt/mqtt#0.0.0+20170123053929"
-  }
-}
