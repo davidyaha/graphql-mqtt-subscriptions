@@ -250,6 +250,7 @@ describe('SubscriptionManager', function () {
     }`;
     const callback = function (err, payload) {
       try {
+        // tslint:disable-next-line no-unused-expression
         expect(payload).to.be.undefined;
         expect(err.message).to.equals(
           'Variable "$uga" of required type "Boolean!" was not provided.',
