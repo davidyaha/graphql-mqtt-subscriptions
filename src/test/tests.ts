@@ -1,9 +1,10 @@
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
-import {spy, restore} from 'simple-mock';
-
+import { spy, restore } from 'simple-mock';
+import { isAsyncIterable } from 'iterall';
 import * as mqtt from 'mqtt';
-import {MQTTPubSub} from '../mqtt-pubsub';
+import { QoS } from 'mqtt';
+import { MQTTPubSub } from '../mqtt-pubsub';
 
 chai.use(chaiAsPromised);
 const expect = chai.expect;
@@ -13,7 +14,7 @@ const expect = chai.expect;
 let listener;
 
 const publishSpy = spy((channel, message) => listener && listener(channel, message));
-const subscribeSpy = spy((topic, options, cb) => cb && cb(null, {...options, topic}));
+const subscribeSpy = spy((topic, options, cb) => cb && cb(null, [{ ...options, topic }]));
 const unsubscribeSpy = spy((channel, _, cb) => cb && cb(channel));
 
 const mqttPackage = mqtt as Object;
@@ -77,24 +78,24 @@ describe('MQTTPubSub', function () {
 
   it('cleans up correctly the memory when unsubscribing', function (done) {
     Promise.all([
-             pubSub.subscribe('Posts', () => null),
-             pubSub.subscribe('Posts', () => null),
-           ])
-           .then(([subId, secondSubId]) => {
-             try {
-               // This assertion is done against a private member, if you change the internals, you may want to change that
-               expect((pubSub as any).subscriptionMap[subId]).not.to.be.an('undefined');
-               pubSub.unsubscribe(subId);
+      pubSub.subscribe('Posts', () => null),
+      pubSub.subscribe('Posts', () => null),
+    ])
+      .then(([subId, secondSubId]) => {
+        try {
+          // This assertion is done against a private member, if you change the internals, you may want to change that
+          expect((pubSub as any).subscriptionMap[subId]).not.to.be.an('undefined');
+          pubSub.unsubscribe(subId);
 
-               // This assertion is done against a private member, if you change the internals, you may want to change that
-               expect((pubSub as any).subscriptionMap[subId]).to.be.an('undefined');
-               expect(() => pubSub.unsubscribe(subId)).to.throw(`There is no subscription of id "${subId}"`);
-               pubSub.unsubscribe(secondSubId);
-               done();
-             } catch (e) {
-               done(e);
-             }
-           });
+          // This assertion is done against a private member, if you change the internals, you may want to change that
+          expect((pubSub as any).subscriptionMap[subId]).to.be.an('undefined');
+          expect(() => pubSub.unsubscribe(subId)).to.throw(`There is no subscription of id "${subId}"`);
+          pubSub.unsubscribe(secondSubId);
+          done();
+        } catch (e) {
+          done(e);
+        }
+      });
   });
 
   it('will not unsubscribe from the mqtt channel if there is another subscriber on it\'s subscriber list', function (done) {
@@ -139,7 +140,7 @@ describe('MQTTPubSub', function () {
 
     pubSub.subscribe('Posts', onMessage).then(id1 => {
       return pubSub.subscribe('Posts', onMessage)
-                   .then(id2 => [id1, id2]);
+        .then(id2 => [id1, id2]);
     }).then(subIds => {
       try {
         expect(subIds.length).to.equals(2);
@@ -205,7 +206,7 @@ describe('MQTTPubSub', function () {
 
     pubSub.subscribe('Posts', onMessage).then(subId => {
       try {
-        pubSub.publish('Posts', {comment: 'This is amazing'});
+        pubSub.publish('Posts', { comment: 'This is amazing' });
         unSubId = subId;
       } catch (e) {
         done(e);
@@ -219,7 +220,7 @@ describe('MQTTPubSub', function () {
   });
 
   it('can use transform function to convert the trigger name given into more explicit channel name', function (done) {
-    const triggerTransform = (trigger, {repoName}) => `${trigger}.${repoName}`;
+    const triggerTransform = (trigger, { repoName }) => `${trigger}.${repoName}`;
     const pubsub = new MQTTPubSub({
       triggerTransform,
     });
@@ -236,7 +237,7 @@ describe('MQTTPubSub', function () {
       }
     };
 
-    pubsub.subscribe('comments', validateMessage, {repoName: 'graphql-mqtt-subscriptions'}).then(subId => {
+    pubsub.subscribe('comments', validateMessage, { repoName: 'graphql-mqtt-subscriptions' }).then(subId => {
       pubsub.publish('comments.graphql-mqtt-subscriptions', 'test');
       unSubId = subId;
     });
@@ -268,7 +269,10 @@ describe('MQTTPubSub', function () {
 
   it('allows to QoS for each publish topic', function (done) {
     const pubsub = new MQTTPubSub({
-      publishOptions: topic => Promise.resolve({qos: topic === 'comments' ? 2 : undefined}),
+      publishOptions: topic => {
+        const qos: QoS = topic === 'comments' ? 2 : undefined;
+        return Promise.resolve({ qos });
+      },
     });
 
     let unSubId;
@@ -292,12 +296,15 @@ describe('MQTTPubSub', function () {
 
   it('allows to set QoS for each topic subscription', function (done) {
     const pubsub = new MQTTPubSub({
-      subscribeOptions: topic => Promise.resolve({qos: topic === 'comments' ? 2 : undefined}),
+      subscribeOptions: topic => {
+        const qos: QoS = topic === 'comments' ? 2 : undefined;
+        return Promise.resolve({ qos });
+      },
       onMQTTSubscribe: (id, granted) => {
         pubsub.unsubscribe(id);
         try {
-          expect(granted.topic).to.equals('comments');
-          expect(granted.qos).to.equals(2);
+          expect(granted[0].topic).to.equals('comments');
+          expect(granted[0].qos).to.equals(2);
           done();
         } catch (e) {
           done(e);
@@ -316,6 +323,94 @@ describe('MQTTPubSub', function () {
 
   after('Restore mqtt client', () => {
     restore();
+  });
+
+});
+
+describe('PubSubAsyncIterator', function () {
+
+  it('should expose valid asyncItrator for a specific event', () => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator(eventName);
+    // tslint:disable-next-line:no-unused-expression
+    expect(iterator).to.exist;
+    // tslint:disable-next-line:no-unused-expression
+    expect(isAsyncIterable(iterator)).to.be.true;
+  });
+
+  it('should trigger event on asyncIterator when published', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator(eventName);
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.exist;
+      done();
+    });
+
+    pubSub.publish(eventName, { test: true });
+  });
+
+  it('should not trigger event on asyncIterator when publishing other event', () => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test2';
+    const iterator = pubSub.asyncIterator('test');
+    const triggerSpy = spy(() => undefined);
+
+    iterator.next().then(triggerSpy);
+    pubSub.publish(eventName, { test: true });
+    expect(triggerSpy.callCount).to.equal(0);
+  });
+
+  it('register to multiple events', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test2';
+    const iterator = pubSub.asyncIterator(['test', 'test2']);
+    const triggerSpy = spy(() => undefined);
+
+    iterator.next().then(() => {
+      triggerSpy();
+      expect(triggerSpy.callCount).to.be.gte(1);
+      done();
+    });
+    pubSub.publish(eventName, { test: true });
+  });
+
+  it('should not trigger event on asyncIterator already returned', done => {
+    const pubSub = new MQTTPubSub();
+    const eventName = 'test';
+    const iterator = pubSub.asyncIterator<any>(eventName);
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).to.exist;
+      expect(result.value.test).to.equal('word');
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.be.false;
+    });
+
+    pubSub.publish(eventName, { test: 'word' });
+
+    iterator.next().then(result => {
+      // tslint:disable-next-line:no-unused-expression
+      expect(result).to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.value).not.to.exist;
+      // tslint:disable-next-line:no-unused-expression
+      expect(result.done).to.be.true;
+      done();
+    });
+
+    iterator.return();
+    pubSub.publish(eventName, { test: true });
   });
 
 });

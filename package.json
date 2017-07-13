@@ -1,6 +1,6 @@
 {
   "name": "graphql-mqtt-subscriptions",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A graphql-subscriptions PubSub Engine using mqtt protocol",
   "main": "dist/index.js",
   "repository": {
@@ -34,28 +34,26 @@
     "prepublish": "npm run test"
   },
   "dependencies": {
-    "async": "^2.0.1",
-    "graphql-subscriptions": "^0.3.0",
+    "graphql-subscriptions": "^0.4.2",
+    "iterall": "^1.1.1",
     "mqtt": "^2.3.0"
   },
   "devDependencies": {
-    "@types/async": "^2.0.35",
     "@types/chai": "^3.4.34",
-    "@types/chai-as-promised": "0.0.29",
-    "@types/graphql": "^0.8.2",
+    "@types/chai-as-promised": "0.0.30",
+    "@types/graphql": "^0.9.0",
     "@types/mocha": "^2.2.33",
-    "@types/mqtt": "^0.0.33",
-    "@types/node": "7.0.5",
+    "@types/node": "7.0.18",
     "@types/simple-mock": "0.0.27",
     "chai": "^3.5.0",
     "chai-as-promised": "^6.0.0",
-    "graphql": "^0.7.0 || ^0.8.0 || ^0.9.0",
+    "graphql": "^0.10.1",
     "istanbul": "1.0.0-alpha.2",
     "mocha": "^3.0.0",
-    "remap-istanbul": "^0.8.4",
+    "remap-istanbul": "^0.9.5",
     "simple-mock": "^0.7.0",
-    "tslint": "^4.4.2",
-    "typescript": "^2.1.4"
+    "tslint": "^5.2.0",
+    "typescript": "^2.3.4"
   },
   "typings": "dist/index.d.ts",
   "typescript": {
