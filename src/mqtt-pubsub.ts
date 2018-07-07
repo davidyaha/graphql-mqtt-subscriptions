@@ -144,8 +144,8 @@ export class MQTTPubSub implements PubSubEngine {
   private onMessage(topic: string, message: Buffer) {
     const subscribers = [].concat(
         ...Object.entries(this.subsRefsMap)
-            .filter(([key, value]) => MQTTPubSub.matches(key, topic))
-            .map(([key, value]) => value),
+            .filter(([key]) => MQTTPubSub.matches(key, topic))
+            .map(([_, value]) => value),
     );
 
     // Don't work for nothing..
