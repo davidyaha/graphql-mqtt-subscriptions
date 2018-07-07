@@ -117,8 +117,36 @@ export class MQTTPubSub implements PubSubEngine {
     return new PubSubAsyncIterator<T>(this, triggers);
   }
 
+  private static matches(pattern: string, topic: string) {
+    const patternSegments = pattern.split('/');
+    const topicSegments = topic.split('/');
+    const patternLength = patternSegments.length;
+
+    for (let i = 0; i < patternLength; i++) {
+        const currentPattern = patternSegments[i];
+        const currentTopic = topicSegments[i];
+        if (!currentTopic && !currentPattern) {
+            continue;
+        }
+        if (!currentTopic && currentPattern !== '#') {
+            return false;
+        }
+        if (currentPattern[0] === '#') {
+            return i === (patternLength - 1);
+        }
+        if (currentPattern[0] !== '+' && currentPattern !== currentTopic) {
+            return false;
+        }
+    }
+    return patternLength === (topicSegments.length);
+  }
+
   private onMessage(topic: string, message: Buffer) {
-    const subscribers = this.subsRefsMap[topic];
+    const subscribers = [].concat(
+        ...Object.entries(this.subsRefsMap)
+            .filter(([key, value]) => MQTTPubSub.matches(key, topic))
+            .map(([key, value]) => value),
+    );
 
     // Don't work for nothing..
     if (!subscribers || !subscribers.length)
