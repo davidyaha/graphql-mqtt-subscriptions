@@ -414,3 +414,106 @@ describe('PubSubAsyncIterator', function () {
   });
 
 });
+
+describe('Wildcards in subscription topic', function () {
+
+  it('should receive message while subscribing to topic containing wildcard', done => {
+    const pubSub = new MQTTPubSub();
+    let unSubIds = [];
+    let callCount = 0;
+    const onMessageSpy = spy(() => {
+      callCount++;
+      if (callCount === 3) {
+        pubSub.unsubscribe(unSubIds[0]);
+        pubSub.unsubscribe(unSubIds[1]);
+
+        expect(onMessageSpy.callCount).to.equals(3);
+        onMessageSpy.calls.forEach(call => {
+          expect(call.args).to.have.members(['test']);
+        });
+
+        done();
+      }
+    });
+    const subscriptionPromises = [
+      pubSub.subscribe('Posts/#', onMessageSpy as Function),
+      pubSub.subscribe('Posts/CategoryA', onMessageSpy as Function),
+    ];
+
+    Promise.all(subscriptionPromises).then(subIds => {
+      try {
+        expect(subIds.length).to.equals(2);
+        pubSub.publish('Posts/CategoryA', 'test');
+        pubSub.publish('Posts/CategoryB', 'test');
+        unSubIds = subIds;
+      } catch (e) {
+        done(e);
+      }
+    });
+  });
+
+  it('can subscribe to everything with "#" topic', function (done) {
+    const pubSub = new MQTTPubSub();
+    let sub;
+    let expectedMessages = ['test0', 'test1', 'test2', 'test3'];
+    let messages = [];
+    const onMessage = message => {
+      try {
+        if (messages.length === 3) {
+          messages.push(message);
+          expect(messages).to.deep.equal(expectedMessages);
+          pubSub.unsubscribe(sub);
+          done();
+        } else {
+          messages.push(message);
+        }
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubSub.subscribe('#', onMessage).then(subId => {
+      expect(subId).to.be.a('number');
+      pubSub.publish('Posts', 'test0');
+      pubSub.publish('Posts/A', 'test1');
+      pubSub.publish('Posts/A/B', 'test2');
+      pubSub.publish('Posts/A/D/C', 'test3');
+      sub = subId;
+    }).catch(err => done(err));
+  });
+
+  it('can subscribe to only specific subset', function (done) {
+    const pubSub = new MQTTPubSub();
+    let sub;
+    let expectedMessages = ['test2', 'test3', 'test4'];
+    let messages = [];
+    const onMessage = message => {
+      try {
+        if (expectedMessages.includes(message)) {
+          if (messages.length === 2) {
+            messages.push(message);
+            expect(messages).to.deep.equal(expectedMessages);
+            pubSub.unsubscribe(sub);
+            done();
+          } else {
+            messages.push(message);
+          }
+        }
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubSub.subscribe('Posts/+/D', onMessage).then(subId => {
+      expect(subId).to.be.a('number');
+      pubSub.publish('Posts/A', 'test1');
+      pubSub.publish('Posts/B/D', 'test2');
+      pubSub.publish('Posts/C/D', 'test3');
+      pubSub.publish('Posts/E/D', 'test4');
+      pubSub.publish('Posts/F/G', 'test5');
+      pubSub.publish('Posts/H/D/I', 'test6');
+      pubSub.publish('Posts', 'test7');
+      sub = subId;
+    }).catch(err => done(err));
+  });
+});
