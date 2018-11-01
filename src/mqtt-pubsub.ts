@@ -38,8 +38,8 @@ export class MQTTPubSub implements PubSubEngine {
     this.subsRefsMap = {};
     this.currentSubscriptionId = 0;
     this.onMQTTSubscribe = options.onMQTTSubscribe || (() => null);
-    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({}));
-    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({}));
+    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({} as IClientPublishOptions));
+    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({} as IClientSubscribeOptions));
     this.parseMessageWithEncoding = options.parseMessageWithEncoding;
   }
 
