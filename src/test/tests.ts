@@ -489,7 +489,7 @@ describe('Wildcards in subscription topic', function () {
     let messages = [];
     const onMessage = message => {
       try {
-        if (expectedMessages.includes(message)) {
+        if (expectedMessages.indexOf(message) !== -1) {
           if (messages.length === 2) {
             messages.push(message);
             expect(messages).to.deep.equal(expectedMessages);
