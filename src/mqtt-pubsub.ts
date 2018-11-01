@@ -15,6 +15,40 @@ export interface PubSubMQTTOptions {
 
 export class MQTTPubSub implements PubSubEngine {
 
+  private triggerTransform: TriggerTransform;
+  private onMQTTSubscribe: SubscribeHandler;
+  private subscribeOptionsResolver: SubscribeOptionsResolver;
+  private publishOptionsResolver: PublishOptionsResolver;
+  private mqttConnection: Client;
+  private subscriptionMap: { [subId: number]: [string, Function] };
+  private subsRefsMap: { [trigger: string]: Array<number> };
+  private currentSubscriptionId: number;
+  private parseMessageWithEncoding: string;
+
+  private static matches(pattern: string, topic: string) {
+    const patternSegments = pattern.split('/');
+    const topicSegments = topic.split('/');
+    const patternLength = patternSegments.length;
+
+    for (let i = 0; i < patternLength; i++) {
+      const currentPattern = patternSegments[i];
+      const currentTopic = topicSegments[i];
+      if (!currentTopic && !currentPattern) {
+        continue;
+      }
+      if (!currentTopic && currentPattern !== '#') {
+        return false;
+      }
+      if (currentPattern[0] === '#') {
+        return i === (patternLength - 1);
+      }
+      if (currentPattern[0] !== '+' && currentPattern !== currentTopic) {
+        return false;
+      }
+    }
+    return patternLength === (topicSegments.length);
+  }
+
   constructor(options: PubSubMQTTOptions = {}) {
     this.triggerTransform = options.triggerTransform || (trigger => trigger as string);
 
@@ -38,8 +72,8 @@ export class MQTTPubSub implements PubSubEngine {
     this.subsRefsMap = {};
     this.currentSubscriptionId = 0;
     this.onMQTTSubscribe = options.onMQTTSubscribe || (() => null);
-    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({}));
-    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({}));
+    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({} as IClientPublishOptions));
+    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({} as IClientSubscribeOptions));
     this.parseMessageWithEncoding = options.parseMessageWithEncoding;
   }
 
@@ -94,8 +128,9 @@ export class MQTTPubSub implements PubSubEngine {
     const [triggerName = null] = this.subscriptionMap[subId] || [];
     const refs = this.subsRefsMap[triggerName];
 
-    if (!refs)
+    if (!refs) {
       throw new Error(`There is no subscription of id "${subId}"`);
+    }
 
     let newRefs;
     if (refs.length === 1) {
@@ -104,7 +139,7 @@ export class MQTTPubSub implements PubSubEngine {
 
     } else {
       const index = refs.indexOf(subId);
-      if (index != -1) {
+      if (index > -1) {
         newRefs = [...refs.slice(0, index), ...refs.slice(index + 1)];
       }
     }
@@ -118,12 +153,16 @@ export class MQTTPubSub implements PubSubEngine {
   }
 
   private onMessage(topic: string, message: Buffer) {
-    const subscribers = this.subsRefsMap[topic];
+    const subscribers = [].concat(
+        ...Object.keys(this.subsRefsMap)
+        .filter((key) => MQTTPubSub.matches(key, topic))
+        .map((key) => this.subsRefsMap[key]),
+    );
 
     // Don't work for nothing..
-    if (!subscribers || !subscribers.length)
+    if (!subscribers || !subscribers.length) {
       return;
-
+    }
     const messageString = message.toString(this.parseMessageWithEncoding);
     let parsedMessage;
     try {
@@ -137,17 +176,6 @@ export class MQTTPubSub implements PubSubEngine {
       listener(parsedMessage);
     }
   }
-
-  private triggerTransform: TriggerTransform;
-  private onMQTTSubscribe: SubscribeHandler;
-  private subscribeOptionsResolver: SubscribeOptionsResolver;
-  private publishOptionsResolver: PublishOptionsResolver;
-  private mqttConnection: Client;
-
-  private subscriptionMap: { [subId: number]: [string, Function] };
-  private subsRefsMap: { [trigger: string]: Array<number> };
-  private currentSubscriptionId: number;
-  private parseMessageWithEncoding: string;
 }
 
 export type Path = Array<string | number>;
