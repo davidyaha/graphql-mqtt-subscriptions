@@ -1,7 +1,10 @@
 # graphql-mqtt-subscriptions
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/davidyaha/graphql-mqtt-subscriptions.svg)](https://greenkeeper.io/)
+
 This package implements the AsyncIterator Interface and PubSubEngine Interface from the [graphql-subscriptions](https://github.com/apollographql/graphql-subscriptions) package. 
 It allows you to connect your subscriptions manager to an MQTT enabled Pub Sub broker to support 
+
 horizontally scalable subscriptions setup.
 This package is an adapted version of my [graphql-redis-subscriptions](https://github.com/davidyaha/graphql-redis-subscriptions) package.
 
