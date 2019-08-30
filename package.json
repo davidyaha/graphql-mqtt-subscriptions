@@ -34,26 +34,26 @@
     "prepublish": "npm run test"
   },
   "dependencies": {
-    "graphql-subscriptions": "^0.4.2",
+    "graphql-subscriptions": "^1.1.0",
     "iterall": "^1.1.1",
     "mqtt": "^2.3.0"
   },
   "devDependencies": {
-    "@types/chai": "^3.4.34",
-    "@types/chai-as-promised": "0.0.30",
-    "@types/graphql": "^0.9.0",
-    "@types/mocha": "^2.2.33",
-    "@types/node": "7.0.18",
-    "@types/simple-mock": "0.0.27",
-    "chai": "^3.5.0",
-    "chai-as-promised": "^6.0.0",
-    "graphql": "^0.10.1",
+    "@types/chai": "^4.1.7",
+    "@types/chai-as-promised": "7.1.0",
+    "@types/graphql": "^14.2.0",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "12.0.2",
+    "@types/simple-mock": "0.8.1",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "graphql": "^14.3.0",
     "istanbul": "1.0.0-alpha.2",
-    "mocha": "^3.0.0",
-    "remap-istanbul": "^0.9.5",
-    "simple-mock": "^0.7.0",
+    "mocha": "^6.1.4",
+    "remap-istanbul": "^0.13.0",
+    "simple-mock": "^0.8.0",
     "tslint": "^5.2.0",
-    "typescript": "^2.3.4"
+    "typescript": "^3.4.5"
   },
   "typings": "dist/index.d.ts",
   "typescript": {
