@@ -11,6 +11,7 @@ export interface PubSubMQTTOptions {
   onMQTTSubscribe?: (id: number, granted: ISubscriptionGrant[]) => void;
   triggerTransform?: TriggerTransform;
   parseMessageWithEncoding?: string;
+  rawData?: boolean;
 }
 
 export class MQTTPubSub implements PubSubEngine {
@@ -24,6 +25,7 @@ export class MQTTPubSub implements PubSubEngine {
   private subsRefsMap: { [trigger: string]: Array<number> };
   private currentSubscriptionId: number;
   private parseMessageWithEncoding: string;
+  private rawData: boolean;
 
   private static matches(pattern: string, topic: string) {
     const patternSegments = pattern.split('/');
@@ -75,11 +77,17 @@ export class MQTTPubSub implements PubSubEngine {
     this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({} as IClientPublishOptions));
     this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({} as IClientSubscribeOptions));
     this.parseMessageWithEncoding = options.parseMessageWithEncoding;
+    this.rawData = options.rawData;
   }
 
   public publish(trigger: string, payload: any): boolean {
     this.publishOptionsResolver(trigger, payload).then(publishOptions => {
-      const message = Buffer.from(JSON.stringify(payload), this.parseMessageWithEncoding);
+      let message;
+      if (this.rawData) {
+        message = Buffer.from(payload);
+      } else {
+        message = Buffer.from(JSON.stringify(payload), this.parseMessageWithEncoding);
+      }
 
       this.mqttConnection.publish(trigger, message, publishOptions);
     });
@@ -163,12 +171,20 @@ export class MQTTPubSub implements PubSubEngine {
     if (!subscribers || !subscribers.length) {
       return;
     }
-    const messageString = message.toString(this.parseMessageWithEncoding);
+
     let parsedMessage;
-    try {
-      parsedMessage = JSON.parse(messageString);
-    } catch (e) {
-      parsedMessage = messageString;
+    if (this.rawData) {
+      parsedMessage = {
+        topic,
+        message,
+      };
+    } else {
+      const messageString = message.toString(this.parseMessageWithEncoding);
+      try {
+        parsedMessage = JSON.parse(messageString);
+      } catch (e) {
+        parsedMessage = messageString;
+      }
     }
 
     for (const subId of subscribers) {
