@@ -244,6 +244,31 @@ describe('MQTTPubSub', function () {
 
   });
 
+  it('allows to return an object with the raw topic and message buffer', function (done) {
+    const pubsub = new MQTTPubSub({
+      rawData: true,
+    });
+
+    let unSubId;
+    const validateMessage = message => {
+      pubsub.unsubscribe(unSubId);
+
+      try {
+        let messageAsString = message.message.toString();
+        expect(message.topic).to.equals('comments');
+        expect(messageAsString).to.equals('test');
+        done();
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubsub.subscribe('comments', validateMessage).then(subId => {
+      pubsub.publish('comments', 'test');
+      unSubId = subId;
+    });
+  });
+
   it('allows to change encodings of messages passed through MQTT broker', function (done) {
     const pubsub = new MQTTPubSub({
       parseMessageWithEncoding: 'base64',
