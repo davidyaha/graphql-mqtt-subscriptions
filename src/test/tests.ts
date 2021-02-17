@@ -244,6 +244,33 @@ describe('MQTTPubSub', function () {
 
   });
 
+  it('can subscribe with fullPacketInfo', function (done) {
+    const pubSubPacketInfo = new MQTTPubSub({
+      includeFullPacketInfo: true,
+    });
+
+    let sub;
+    const onMessage = ({ topic, payload, parsedMessage }) => {
+      pubSubPacketInfo.unsubscribe(sub);
+
+      try {
+        expect(topic).to.equals('Posts');
+        expect(payload).not.to.be.an('undefined');
+        expect(parsedMessage).to.equals('test');
+        done();
+      } catch (e) {
+        done(e);
+      }
+    };
+
+    pubSubPacketInfo.subscribe('Posts', onMessage).then(subId => {
+      expect(subId).to.be.a('number');
+      pubSubPacketInfo.publish('Posts', 'test');
+      sub = subId;
+    }).catch(err => done(err));
+
+  });
+
   it('allows to change encodings of messages passed through MQTT broker', function (done) {
     const pubsub = new MQTTPubSub({
       parseMessageWithEncoding: 'base64',
