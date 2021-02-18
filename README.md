@@ -66,7 +66,45 @@ When messages are received from the topic, those messages can be returned back t
 ```js
 pubsub.publish(SOMETHING_CHANGED_TOPIC, { somethingChanged: { id: "123" }});
 ```
+## Resolving Subscription Callbacks
+By default, MQTTPubSub will respond to subscriptions with the message in the form of a string or a JSON object, if the message can be parsed as valid JSON.
+```typescript
+const pubsub = new MQTTPubSub();
+const onMsg = (msg: string | Object) => {
+  console.log(msg);
+}
+pubsub.subscribe('Posts/#', onMsg);
+pubsub.publish('Posts/A', 'Hello mosquitto.')
+//Output:
+//Hello mosquitto.
+//But we don't know what topic sent the message (Posts/A, Posts/B, etc.)
+```
+However, if you set the includeFullPacketInfo option to true when initializing your MQTTPubSub, the subscribtions will resolve with an object containing the full topic, the raw payload buffer, the mqtt packet info, and the message as string or JSON.  This allows to have more complex subscriptions.  For example, you can subscribe to the topic '#' and record all topics currently being published to the MQTT server.
 
+```typescript
+const pubsub = new MQTTPubSub({ includeFullPacketInfo: true });
+const onMsg = (mqttPacket: { topic: string, parsedMessage: string | Object, payload: Buffer, packet: Packet}) => {
+  console.log(`Recieved ${mqttPacket.parsedMessage} from topic ${mqttPacket.topic}`);
+}
+pubsub.subscribe('Posts/#', onMsg);
+pubsub.publish('Posts/A', 'Hello mosquitto.')
+//Output:
+//Recieved Hello mosquitto. from topic Posts/A
+```
+This output mode can also be used with the asyncIterator:
+```javascript
+export const resolvers = {
+  Subscription: {
+    somethingChanged: {
+      subscribe: () => pubsub.asyncIterator('topic'),
+      resolve: (mqttPacket) => {
+        // format info appropriately
+        return { topic: mqttPacket.topic, message: mqttPacket.parsedMessage }
+      }
+    }
+  }
+}
+```
 ## Dynamically Create a Topic Based on Subscription Args Passed on the Query:
 
 ```javascript
@@ -77,8 +115,14 @@ export const resolvers = {
     },
   },
 }
+export const resolvers = {
+  Subscription: {
+    somethingChanged: {
+      subscribe: () => pubsub.asyncIterator(SOMETHING_CHANGED_TOPIC)
+    }
+  }
+}
 ```
-
 ## Using Arguments and Payload to Filter Events
 
 ```javascript
@@ -215,7 +259,7 @@ When `subscribe` is called like this:
 
 ```javascript
 const query = `
-  subscription X($repoName: String!) {
+  subscription ($repoName: String!) {
     commentsAdded(repoName: $repoName)
   }
 `;

@@ -1,5 +1,5 @@
 import { PubSubEngine } from 'graphql-subscriptions/dist/pubsub-engine';
-import { connect, Client, ISubscriptionGrant, IClientPublishOptions, IClientSubscribeOptions } from 'mqtt';
+import { connect, Client, ISubscriptionGrant, IClientPublishOptions, IClientSubscribeOptions, Packet } from 'mqtt';
 import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 export interface PubSubMQTTOptions {
@@ -10,7 +10,8 @@ export interface PubSubMQTTOptions {
   subscribeOptions?: SubscribeOptionsResolver;
   onMQTTSubscribe?: (id: number, granted: ISubscriptionGrant[]) => void;
   triggerTransform?: TriggerTransform;
-  parseMessageWithEncoding?: string;
+  parseMessageWithEncoding?: BufferEncoding;
+  includeFullPacketInfo?: boolean;
 }
 
 export class MQTTPubSub implements PubSubEngine {
@@ -23,7 +24,8 @@ export class MQTTPubSub implements PubSubEngine {
   private subscriptionMap: { [subId: number]: [string, Function] };
   private subsRefsMap: { [trigger: string]: Array<number> };
   private currentSubscriptionId: number;
-  private parseMessageWithEncoding: string;
+  private parseMessageWithEncoding: BufferEncoding;
+  private includeFullPacketInfo?: boolean;
 
   private static matches(pattern: string, topic: string) {
     const patternSegments = pattern.split('/');
@@ -75,6 +77,7 @@ export class MQTTPubSub implements PubSubEngine {
     this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({} as IClientPublishOptions));
     this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({} as IClientSubscribeOptions));
     this.parseMessageWithEncoding = options.parseMessageWithEncoding;
+    this.includeFullPacketInfo = options.includeFullPacketInfo;
   }
 
   public publish(trigger: string, payload: any): boolean {
@@ -152,18 +155,17 @@ export class MQTTPubSub implements PubSubEngine {
     return new PubSubAsyncIterator<T>(this, triggers);
   }
 
-  private onMessage(topic: string, message: Buffer) {
+  private onMessage(topic: string, payload: Buffer, packet: Packet) {
     const subscribers = [].concat(
-        ...Object.keys(this.subsRefsMap)
+      ...Object.keys(this.subsRefsMap)
         .filter((key) => MQTTPubSub.matches(key, topic))
         .map((key) => this.subsRefsMap[key]),
     );
-
     // Don't work for nothing..
     if (!subscribers || !subscribers.length) {
       return;
     }
-    const messageString = message.toString(this.parseMessageWithEncoding);
+    const messageString = payload.toString(this.parseMessageWithEncoding);
     let parsedMessage;
     try {
       parsedMessage = JSON.parse(messageString);
@@ -173,7 +175,11 @@ export class MQTTPubSub implements PubSubEngine {
 
     for (const subId of subscribers) {
       const listener = this.subscriptionMap[subId][1];
-      listener(parsedMessage);
+      if (this.includeFullPacketInfo) {
+        listener({ topic, payload, packet, parsedMessage });
+      } else {
+        listener(parsedMessage);
+      }
     }
   }
 }
